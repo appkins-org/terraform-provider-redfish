@@ -23,7 +23,7 @@ import (
 
 // VirtualMedia struct
 type VirtualMedia struct {
-	VirtualMediaID       types.String    `tfsdk:"id"`
+	ID                   types.String    `tfsdk:"id"`
 	RedfishServer        []RedfishServer `tfsdk:"redfish_server"`
 	Image                types.String    `tfsdk:"image"`
 	Inserted             types.Bool      `tfsdk:"inserted"`
@@ -31,6 +31,9 @@ type VirtualMedia struct {
 	TransferProtocolType types.String    `tfsdk:"transfer_protocol_type"`
 	WriteProtected       types.Bool      `tfsdk:"write_protected"`
 	SystemID             types.String    `tfsdk:"system_id"`
+	VirtualMediaID       types.String    `tfsdk:"virtual_media_id"`
+	UserName             types.String    `tfsdk:"username"`
+	Password             types.String    `tfsdk:"password"`
 }
 
 // VirtualMediaDataSource struct for datasource

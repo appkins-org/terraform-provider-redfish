@@ -42,6 +42,7 @@ type BootOptions struct {
 // BootSourceOverride is struct for configuring boot source override options
 type BootSourceOverride struct {
 	ID                           types.String    `tfsdk:"id"`
+	BootNext                     types.String    `tfsdk:"boot_next"`
 	BootSourceOverrideMode       types.String    `tfsdk:"boot_source_override_mode"`
 	BootSourceOverrideEnabled    types.String    `tfsdk:"boot_source_override_enabled"`
 	BootSourceOverrideTarget     types.String    `tfsdk:"boot_source_override_target"`

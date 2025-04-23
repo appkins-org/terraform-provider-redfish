@@ -113,6 +113,11 @@ func BootSourceOverrideSchema() map[string]schema.Attribute {
 				stringplanmodifier.RequiresReplaceIfConfigured(),
 			},
 		},
+		"boot_next": schema.StringAttribute{
+			MarkdownDescription: "The next boot device to be used when boot source is booted from.",
+			Description:         "The next boot device to be used when boot source is booted from.",
+			Optional:            true,
+		},
 		"boot_source_override_enabled": schema.StringAttribute{
 			MarkdownDescription: "The state of the Boot Source Override feature.",
 			Description:         "The state of the Boot Source Override feature.",
@@ -307,64 +312,47 @@ func (r *BootSourceOverrideResource) bootOperation(ctx context.Context, service 
 	}
 
 	plan.SystemID = types.StringValue(system.ID)
-	isGenerationSeventeenAndAbove, err := isServerGenerationSeventeenAndAbove(service)
+
+	res, err := dell.ComputerSystems(system)
 	if err != nil {
-		diags.AddError("Error retrieving the server generation", err.Error())
+		diags.AddError("Error retrieving the systems settings URI", err.Error())
 		return diags
 	}
-	// for 17G use system settings api for PATCH call
-	if isGenerationSeventeenAndAbove {
-		if !plan.BootSourceOverrideMode.IsUnknown() && !plan.BootSourceOverrideMode.IsNull() {
-			diags.AddError("BootSourceOverrideMode is not supported by 17G server", "Unable to support BootSourceOverrideMode for 17G")
-			return diags
-		}
+	uri = res.Settings.OdataID
 
-		res, err := dell.ComputerSystems(system)
-		uri = res.Settings.OdataID
-		if err != nil {
-			diags.AddError("Error retrieving the systems settings URI", err.Error())
-			return diags
-		}
+	settings, err := service.GetClient().Get(uri)
+	if err != nil {
+		diags.AddError("Error retrieving the systems settings", err.Error())
+		return diags
+	}
+	etag := settings.Header.Get("Etag")
 
-		type Boot struct {
-			BootSourceOverrideEnabled redfish.BootSourceOverrideEnabled
-			BootSourceOverrideTarget  redfish.BootSourceOverrideTarget
-		}
-		type Payload struct {
-			Boot Boot `json:"Boot"`
-		}
-		var payload Payload
-		payload.Boot.BootSourceOverrideEnabled = redfish.BootSourceOverrideEnabled(plan.BootSourceOverrideEnabled.ValueString())
-		payload.Boot.BootSourceOverrideTarget = redfish.BootSourceOverrideTarget(plan.BootSourceOverrideTarget.ValueString())
-		_, err = service.GetClient().Patch(uri, payload)
-		if err != nil {
-			diags.AddError("Cannot update boot override details ", err.Error())
-			return diags
-		}
-	} else {
-		// Below 17G will have System API for PATCH call
-		uri = system.ODataID
-		type Boot struct {
-			BootSourceOverrideMode    redfish.BootSourceOverrideMode
-			BootSourceOverrideEnabled redfish.BootSourceOverrideEnabled
-			BootSourceOverrideTarget  redfish.BootSourceOverrideTarget
-		}
-		type Payload struct {
-			Boot Boot `json:"Boot"`
-		}
-		var payload Payload
-		payload.Boot.BootSourceOverrideMode = redfish.BootSourceOverrideMode(plan.BootSourceOverrideMode.ValueString())
-		payload.Boot.BootSourceOverrideEnabled = redfish.BootSourceOverrideEnabled(plan.BootSourceOverrideEnabled.ValueString())
-		payload.Boot.BootSourceOverrideTarget = redfish.BootSourceOverrideTarget(plan.BootSourceOverrideTarget.ValueString())
-		resp, err = service.GetClient().Patch(uri, payload)
-		if err != nil {
-			diags.AddError("Cannot update boot override details ", err.Error())
-			return diags
-		}
-		jobID := resp.Header.Get("Location")
-		if jobID != "" {
-			diags.Append(r.restartServer(ctx, service, jobID, plan)...)
-		}
+	type Boot struct {
+		BootNext                     string `json:",omitempty"`
+		BootSourceOverrideEnabled    redfish.BootSourceOverrideEnabled
+		BootSourceOverrideTarget     redfish.BootSourceOverrideTarget
+		BootSourceOverrideMode       redfish.BootSourceOverrideMode
+		UefiTargetBootSourceOverride string `json:",omitempty"`
+	}
+	type Payload struct {
+		Boot Boot `json:"Boot"`
+	}
+	var payload Payload
+	payload.Boot.BootSourceOverrideEnabled = redfish.BootSourceOverrideEnabled(plan.BootSourceOverrideEnabled.ValueString())
+	payload.Boot.BootSourceOverrideTarget = redfish.BootSourceOverrideTarget(plan.BootSourceOverrideTarget.ValueString())
+	payload.Boot.BootSourceOverrideMode = redfish.BootSourceOverrideMode(plan.BootSourceOverrideMode.ValueString())
+	payload.Boot.BootNext = plan.BootNext.ValueString()
+
+	resp, err = service.GetClient().PatchWithHeaders(uri, payload, map[string]string{
+		"If-Match": etag,
+	})
+	if err != nil {
+		diags.AddError("Cannot update boot override details ", err.Error())
+		return diags
+	}
+	jobID := resp.Header.Get("Location")
+	if jobID != "" {
+		diags.Append(r.restartServer(ctx, service, jobID, plan)...)
 	}
 	return diags
 }

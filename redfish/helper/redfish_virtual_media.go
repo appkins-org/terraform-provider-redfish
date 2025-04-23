@@ -100,15 +100,42 @@ func InsertMedia(id string, collection []*redfish.VirtualMedia, config redfish.V
 
 // UpdateVirtualMediaState - Copy virtual media details from response to state object
 func UpdateVirtualMediaState(response *redfish.VirtualMedia, plan models.VirtualMedia) models.VirtualMedia {
-	return models.VirtualMedia{
-		VirtualMediaID:       types.StringValue(response.ODataID),
-		Image:                types.StringValue(response.Image),
+	res := models.VirtualMedia{
+		ID:                   plan.ID,
+		Image:                plan.Image,
+		TransferMethod:       plan.TransferMethod,
+		TransferProtocolType: plan.TransferProtocolType,
+		VirtualMediaID:       plan.VirtualMediaID,
+		SystemID:             plan.SystemID,
 		Inserted:             types.BoolValue(response.Inserted),
-		TransferMethod:       types.StringValue(string(response.TransferMethod)),
-		TransferProtocolType: types.StringValue(string(response.TransferProtocolType)),
 		WriteProtected:       types.BoolValue(response.WriteProtected),
 		RedfishServer:        plan.RedfishServer,
+		UserName:             plan.UserName,
+		Password:             plan.Password,
 	}
+
+	if response.UserName != "" {
+		res.UserName = types.StringValue(response.UserName)
+	}
+	if response.Password != "" {
+		res.Password = types.StringValue(response.Password)
+	}
+	if response.ODataID != "" {
+		res.ID = types.StringValue(response.ODataID)
+	}
+	if response.ID != "" && plan.VirtualMediaID.ValueString() == "" {
+		res.VirtualMediaID = types.StringValue(response.ID)
+	}
+	if response.Image != "" {
+		res.Image = types.StringValue(response.Image)
+	}
+	if response.TransferMethod != "" {
+		res.TransferMethod = types.StringValue(string(response.TransferMethod))
+	}
+	if response.TransferProtocolType != "" {
+		res.TransferProtocolType = types.StringValue(string(response.TransferProtocolType))
+	}
+	return res
 }
 
 // GetNejectVirtualMedia - is a helper function to get virtual media and eject the media

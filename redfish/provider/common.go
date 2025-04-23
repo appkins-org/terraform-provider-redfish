@@ -425,28 +425,28 @@ func isServerGenerationSeventeenAndAbove(service *gofish.Service) (bool, error) 
 		return false, err
 	}
 
-	idracAttributes, err := getIdracAttributes(dellAttributes)
-	if err != nil {
-		return false, err
-	}
+	if idracAttributes, err := getIdracAttributes(dellAttributes); err == nil {
 
-	serverGen := ""
-	for k, v := range idracAttributes.Attributes {
-		if k == "Info.1.ServerGen" && v != nil {
-			serverGen = v.(string)
-			break
+		serverGen := ""
+		for k, v := range idracAttributes.Attributes {
+			if k == "Info.1.ServerGen" && v != nil {
+				serverGen = v.(string)
+				break
+			}
 		}
+
+		if serverGen == "" {
+			return false, errors.New("server generation not found")
+		}
+
+		gen := serverGen[:len(serverGen)-1]
+		genVal, err := strconv.Atoi(gen)
+		if err != nil {
+			return false, err
+		}
+
+		return genVal >= Seventeen, nil
 	}
 
-	if serverGen == "" {
-		return false, errors.New("server generation not found")
-	}
-
-	gen := serverGen[:len(serverGen)-1]
-	genVal, err := strconv.Atoi(gen)
-	if err != nil {
-		return false, err
-	}
-
-	return genVal >= Seventeen, nil
+	return false, nil
 }

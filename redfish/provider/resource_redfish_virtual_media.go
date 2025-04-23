@@ -129,6 +129,25 @@ func VirtualMediaSchema() map[string]schema.Attribute {
 				stringplanmodifier.RequiresReplaceIfConfigured(),
 			},
 		},
+		"virtual_media_id": schema.StringAttribute{
+			MarkdownDescription: "Virtual Media ID of the virtual media resource",
+			Description:         "Virtual Media ID of the virtual media resource",
+			Computed:            true,
+			Optional:            true,
+		},
+		"username": schema.StringAttribute{
+			MarkdownDescription: "Username for the Redfish server",
+			Description:         "Username for the Redfish server",
+			Optional:            true,
+			Computed:            true,
+		},
+		"password": schema.StringAttribute{
+			MarkdownDescription: "Password for the Redfish server",
+			Description:         "Password for the Redfish server",
+			Optional:            true,
+			Computed:            true,
+			Sensitive:           true,
+		},
 	}
 }
 
@@ -172,6 +191,8 @@ func (r *virtualMediaResource) Create(ctx context.Context, req resource.CreateRe
 		TransferMethod:       redfish.TransferMethod(plan.TransferMethod.ValueString()),
 		TransferProtocolType: redfish.TransferProtocolType(plan.TransferProtocolType.ValueString()),
 		WriteProtected:       plan.WriteProtected.ValueBool(),
+		UserName:             plan.UserName.ValueString(),
+		Password:             plan.Password.ValueString(),
 	}
 	api, err := NewConfig(r.p, &plan.RedfishServer)
 	if err != nil {
@@ -216,7 +237,9 @@ func (r *virtualMediaResource) Create(ctx context.Context, req resource.CreateRe
 		// Get OOB Manager card - managers[0] will be our oob card
 		var virtualMediaID string
 		plan.SystemID = types.StringValue("")
-		if strings.HasSuffix(plan.Image.ValueString(), ".iso") {
+		if !plan.VirtualMediaID.IsNull() {
+			virtualMediaID = plan.VirtualMediaID.ValueString()
+		} else if strings.HasSuffix(plan.Image.ValueString(), ".iso") {
 			virtualMediaID = "CD"
 		} else {
 			virtualMediaID = "RemovableDisk"
@@ -263,7 +286,7 @@ func (r *virtualMediaResource) Read(ctx context.Context, req resource.ReadReques
 	defer api.Logout()
 
 	// Get virtual media details
-	virtualMedia, err := redfish.GetVirtualMedia(service.GetClient(), state.VirtualMediaID.ValueString())
+	virtualMedia, err := redfish.GetVirtualMedia(service.GetClient(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Virtual Media doesn't exist: ", err.Error())
 		return
@@ -417,7 +440,7 @@ func (r *virtualMediaResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	// Hot update is not possible. Unmount and mount needs to be done to update
-	virtualMedia, err := helper.GetNejectVirtualMedia(service, state.VirtualMediaID.ValueString())
+	virtualMedia, err := helper.GetNejectVirtualMedia(service, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(err.Error(), err.Error()) // This error won't be triggered ever
 		return
@@ -435,7 +458,7 @@ func (r *virtualMediaResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	// Get virtual media details
-	virtualMedia, err = redfish.GetVirtualMedia(service.GetClient(), state.VirtualMediaID.ValueString())
+	virtualMedia, err = redfish.GetVirtualMedia(service.GetClient(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Virtual Media doesn't exist: %s", err.Error()) // This error won't be triggered ever
 		return
@@ -469,7 +492,7 @@ func (r *virtualMediaResource) Delete(ctx context.Context, req resource.DeleteRe
 	defer api.Logout()
 
 	// Get virtual media details and Eject Media
-	virtualMedia, err := helper.GetNejectVirtualMedia(service, state.VirtualMediaID.ValueString())
+	virtualMedia, err := helper.GetNejectVirtualMedia(service, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(err.Error(), err.Error()) // This error won't be triggered ever
 		return
